@@ -1,0 +1,12 @@
+{
+ "supplier_id":"demo-supplier","update_id":"conflict-001","declared_batch_count":2,
+ "batches":[
+  {"batch_index":0,"is_last":false,"events":[
+   {"product_id":"P100","revision":1,"status":"active","name":"Mouse","price_cents":2900}
+  ]},
+  {"batch_index":1,"is_last":true,"events":[
+   {"product_id":"P200","revision":1,"status":"active","name":"Must Roll Back","price_cents":100},
+   {"product_id":"P100","revision":1,"status":"active","name":"Conflicting Mouse","price_cents":9900}
+  ]}
+ ]
+}

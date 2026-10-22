@@ -1,0 +1,11 @@
+/catalogsync
+/catalogsync.exe
+/bin/
+/demo/
+*.db
+*.db-wal
+*.db-shm
+*.test
+*.test.exe
+/coverage.out
+.codegraph/

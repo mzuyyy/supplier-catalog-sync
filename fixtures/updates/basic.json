@@ -1,0 +1,22 @@
+{
+ "supplier_id":"demo-supplier","update_id":"basic-001","declared_batch_count":3,
+ "batches":[
+  {"batch_index":0,"is_last":false,"events":[
+   {"product_id":"P100","revision":1,"status":"active","name":"Mouse","price_cents":2900},
+   {"product_id":"P101","revision":1,"status":"active","name":"Cable","price_cents":900},
+   {"product_id":"P102","revision":5,"status":"withdrawn"}
+  ]},
+  {"batch_index":1,"is_last":false,"events":[
+   {"product_id":"P100","revision":3,"status":"active","name":"Mouse Pro","price_cents":3200},
+   {"product_id":"P101","revision":2,"status":"withdrawn"},
+   {"product_id":"P103","revision":1,"status":"active","name":"Stand","price_cents":4500}
+  ]},
+  {"batch_index":2,"is_last":true,"events":[
+   {"product_id":"P100","revision":2,"status":"active","name":"Old Mouse","price_cents":2000},
+   {"product_id":"P100","revision":3,"status":"active","name":"Mouse Pro","price_cents":3200},
+   {"product_id":"P102","revision":3,"status":"active","name":"Stale Adapter","price_cents":500},
+   {"product_id":"P101","revision":2,"status":"withdrawn"},
+   {"product_id":"P104","revision":1,"status":"active","name":"Keyboard","price_cents":7000}
+  ]}
+ ]
+}

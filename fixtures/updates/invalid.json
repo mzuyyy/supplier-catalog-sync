@@ -1,0 +1,15 @@
+{
+ "supplier_id":"demo-supplier","update_id":"invalid-001","declared_batch_count":3,
+ "batches":[
+  {"batch_index":0,"is_last":false,"events":[
+   {"product_id":"P100","revision":1,"status":"active","name":"Mouse","price_cents":2900}
+  ]},
+  {"batch_index":1,"is_last":false,"events":[
+   {"product_id":"P101","revision":1,"status":"active","name":"Cable","price_cents":900}
+  ]},
+  {"batch_index":2,"is_last":true,"events":[
+   {"product_id":"P200","revision":1,"status":"active","name":"Must Roll Back","price_cents":100},
+   {"product_id":"BAD","revision":0,"status":"active","name":"Invalid","price_cents":100}
+  ]}
+ ]
+}

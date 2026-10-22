@@ -1,0 +1,14 @@
+{
+ "supplier_id":"demo-supplier","update_id":"reactivate-001","declared_batch_count":3,
+ "batches":[
+  {"batch_index":0,"is_last":false,"events":[
+   {"product_id":"P100","revision":1,"status":"active","name":"Mouse","price_cents":2900}
+  ]},
+  {"batch_index":1,"is_last":false,"events":[
+   {"product_id":"P100","revision":5,"status":"withdrawn"}
+  ]},
+  {"batch_index":2,"is_last":true,"events":[
+   {"product_id":"P100","revision":6,"status":"active","name":"Mouse Returns","price_cents":3000}
+  ]}
+ ]
+}
