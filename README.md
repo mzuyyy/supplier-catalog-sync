@@ -4,7 +4,7 @@ A local Go CLI that imports versioned supplier product events into a durable SQL
 
 ## Build and run
 
-Install Go **1.25 or newer** and run from the repository root. The SQLite driver is pure Go, pinned to `modernc.org/sqlite v1.48.2` in `go.mod` and `go.sum`.
+Install Go **1.25 or newer** and make sure `go version` works in your terminal. Run all commands from the repository root (the directory containing `go.mod`). The SQLite driver is pure Go, pinned to `modernc.org/sqlite v1.48.2` in `go.mod` and `go.sum`; the normal build needs no C compiler, SQLite installation, database server or supplier credentials.
 
 Windows PowerShell:
 
@@ -17,12 +17,7 @@ go build -o catalogsync.exe ./cmd/catalogsync
 .\catalogsync.exe --db .\demo\catalog.db catalog list --include-withdrawn
 ```
 
-This workspace was verified with Go 1.27.3 on Windows/amd64. If using the toolchain installed during implementation and `go` is absent from PATH, enable it for the current PowerShell session:
-
-```powershell
-$env:Path = "$env:USERPROFILE\.local\share\coderpush-toolchain\go\bin;$env:Path"
-go version
-```
+The build and demos were verified with Go 1.27.3 on Windows/amd64.
 
 Bash (Windows Git Bash uses the `.exe` build shown above):
 
@@ -69,13 +64,17 @@ Use a separate fresh DB for each scenario. Repeating a completed update reuses i
 
 **Supplier outage and resume:**
 
+Run the whole block in the same PowerShell window. The first line creates a fresh DB path for each demonstration. Assign `$demoDb` before using it: an unset variable can cause PowerShell to pass `sync` as the value of `--db`.
+
 ```powershell
-.\catalogsync.exe --db .\demo\outage.db sync start --source .\fixtures\updates\basic.json --fail-before-batch 3
+$demoDb = ".\demo\outage-$([DateTime]::UtcNow.Ticks).db"
+.\catalogsync.exe --db "$demoDb" sync start --source .\fixtures\updates\basic.json --fail-before-batch 3
 # Expected exit 2: INTERRUPTED, 2/3 batches, 4 products, 6 changes.
-.\catalogsync.exe --db .\demo\outage.db sync list
-.\catalogsync.exe --db .\demo\outage.db sync issues --job JOB_ID
-.\catalogsync.exe --db .\demo\outage.db sync resume --job JOB_ID
-.\catalogsync.exe --db .\demo\outage.db sync issues --job JOB_ID --all
+$demoJob = ((.\catalogsync.exe --db "$demoDb" sync list) -split "\s+")[0]
+.\catalogsync.exe --db "$demoDb" sync status --job "$demoJob"
+.\catalogsync.exe --db "$demoDb" sync issues --job "$demoJob"
+.\catalogsync.exe --db "$demoDb" sync resume --job "$demoJob"
+.\catalogsync.exe --db "$demoDb" sync issues --job "$demoJob" --all
 ```
 
 The last command shows the outage issue resolved after batch 3 commits. `--fail-before-batch` affects only its invocation.
@@ -112,25 +111,56 @@ For manual inspection, start with `--delay-between-batches 3s`, force-stop that 
 
 SQLite uses one pooled connection per Store with per-connection DSN PRAGMAs: `foreign_keys=ON`, `journal_mode=WAL`, `busy_timeout=5000`, `synchronous=FULL`. Migration version is `PRAGMA user_version=1`; migrations never drop catalog data. A commit error triggers a new pool/connection reading the durable job and ledger before deciding whether the batch persisted.
 
-## Recovery and scope
+## Assumptions
+
+- **Supplier versions:** every event carries a positive integer `revision` that increases per supplier product. Arrival order and local timestamps do not determine freshness. The supplier must not reuse a revision for different content; such input is a blocking conflict.
+- **Identity:** products are identified by `(supplier_id, product_id)`, and updates by `(supplier_id, update_id)`. An update's content is immutable after start.
+- **Delta updates:** batches contain product events, not a complete catalog snapshot. An absent product remains unchanged; withdrawal must be explicit.
+- **Withdrawal policy:** tombstones retain the latest revision, including withdrawals for unknown products. Older active events cannot restore a withdrawn product. A strictly newer active revision may explicitly reactivate it.
+- **Concurrency:** only one synchronizer process runs at a time. Separate read-only inspections are supported, but leases and concurrent-writer coordination are not implemented.
+- **Visibility and money:** committed batches are visible even while a job is incomplete. Monetary values are integer `price_cents`, never floating-point amounts.
+
+## Recovery
 
 The source path and SHA-256 of its original bytes are persisted. **Do not edit or replace a fixture after start.** Resume rejects changed content. Missing files may be restored byte-for-byte and retried. Same supplier/update IDs with changed content are a collision. A corrected **new update ID** creates a new job; the original blocked job remains visible.
 
-One synchronizer process at a time is an explicit assumption; there are no leases or multi-writer guarantees. Separate read-only CLI inspections are supported. Previously committed batches remain visible during incomplete updates. Product absence does not imply withdrawal. Counters include only committed inputs, and skipped duplicates/stale records never create change events.
+Counters include only committed inputs, and skipped duplicates/stale records never create change events. A job left `RUNNING` after force termination remains incomplete until explicit resume finishes the remaining work.
 
-Intentional limitations: fictional JSON source loaded into memory, manual retries, no live API connector, scheduler, distributed coordination, full issue-remediation UI, authentication, snapshot reconciliation, web UI or deployment. Scale is demo-sized. No required core feature is knowingly left unimplemented; interview rehearsal remains a human exercise in [docs/09_DEMO_AND_INTERVIEW.md](docs/09_DEMO_AND_INTERVIEW.md).
+## Unfinished work and limitations
 
-## Verification
+No assignment behavior is knowingly left unfinished. The following extensions are **not implemented**:
+
+- A live supplier connector; the demonstration uses fictional JSON fixtures, as permitted by the assignment.
+- Automatic retry/backoff or a background scheduler; staff run start/resume manually.
+- Multi-writer coordination through leases or fencing; the single-synchronizer assumption applies.
+- An operator workflow for repairing/resolving permanent issues; a corrected new update is required, and the original blocked job remains visible.
+- Streaming and large-catalog performance work; each fixture is loaded into memory and the implementation targets demonstration-sized data.
+
+A visual interface and public deployment are intentionally omitted because the assignment does not require them. Human interview rehearsal is described in [docs/09_DEMO_AND_INTERVIEW.md](docs/09_DEMO_AND_INTERVIEW.md).
+
+## Tests
+
+From the repository root, run the full suite and static checks:
 
 ```powershell
-gofmt -w ./cmd ./internal ./integration
-go vet ./...
 go test ./...
-go test -shuffle=on -count=1 ./...
-go test -race ./...
-go build -o catalogsync.exe ./cmd/catalogsync
+go vet ./...
 ```
 
-Build, formatting, vet and the full test suite were verified locally, including SQLite reopen, SQL fault injection, ledger corruption, source changes, blocked completion and both force-kill scenarios. Race detection was attempted but unavailable in this Windows environment: `go: -race requires cgo; enable cgo by setting CGO_ENABLED=1`; no C compiler was available on PATH. The normal build requires no CGO. LSP diagnostics could not be obtained because the MCP transport closed; compiler and vet checks passed.
+The tests create isolated temporary SQLite files; no existing demo DB, external service or supplier account is required. Coverage includes revision/tombstone rules, duplicate/conflict handling, batch rollback, source identity, persisted progress and actual force-kill/restart recovery. Integration tests build and launch child processes of the CLI.
+
+To run without the test cache and with shuffled test order:
+
+```powershell
+go test -shuffle=on -count=1 ./...
+```
+
+Optional race detection requires a supported CGO-enabled toolchain and C compiler:
+
+```powershell
+go test -race ./...
+```
+
+Build, formatting, vet and the full test suite were verified locally. Race detection was attempted but unavailable in the verification environment: `go: -race requires cgo`; enabling CGO then reported that `gcc` was missing. This is an unverified optional check, not a passing race run. The normal application build and tests need no CGO.
 
 See [docs/12_VERIFICATION.md](docs/12_VERIFICATION.md) for observed demo results. [docs/07_IMPLEMENTATION_PLAN.md](docs/07_IMPLEMENTATION_PLAN.md) tracks delivery; the design documents preserve the acceptance contracts. A small interview extension is `catalog show --supplier S --product P`, adding a lookup and found/not-found CLI tests.
